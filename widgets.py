@@ -15,7 +15,7 @@ from PyQt5.QtCore import (Qt, QPoint, QRectF, QPropertyAnimation,
 from PyQt5.QtGui import (QPainter, QBrush, QColor, QPen, QPainterPath,
                           QRegion, QCursor, QFontMetrics, QPixmap)
 
-from main import get_base_path, get_data_path
+from utils import get_base_path, get_data_path
 
 current_dir = get_base_path()
 data_dir = get_data_path()

@@ -4,21 +4,9 @@ import ctypes
 import os
 
 from PyQt5.QtWidgets import QApplication
-
-
-def get_base_path():
-    """获取资源文件路径（打包后取 _MEIPASS，源码运行取脚本目录）"""
-    if getattr(sys, 'frozen', False):
-        return sys._MEIPASS
-    return os.path.dirname(os.path.abspath(__file__))
-
-
-def get_data_path():
-    """获取用户数据文件路径（exe 所在目录或脚本目录）"""
-    if getattr(sys, 'frozen', False):
-        return os.path.dirname(sys.executable)
-    return os.path.dirname(os.path.abspath(__file__))
 from PyQt5.QtCore import pyqtSignal, QUrl
+
+from utils import get_base_path, get_data_path
 from PyQt5.QtNetwork import QNetworkAccessManager, QNetworkRequest, QNetworkReply
 
 from widgets import EdgeFloatingBlock

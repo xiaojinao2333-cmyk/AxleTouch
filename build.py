@@ -37,6 +37,7 @@ def main():
         "--onefile",                 # 单文件 exe
         "--windowed",                 # 无控制台窗口（GUI 应用）
         "--name", "AxleTouch",
+        "--icon", os.path.join(ROOT, "assets", "icon.ico"),  # exe 图标
         "--distpath", OUTPUT_DIR,
         "--noconfirm",
         "--clean",
