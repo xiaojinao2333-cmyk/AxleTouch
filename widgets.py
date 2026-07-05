@@ -699,6 +699,12 @@ class EdgeFloatingBlock(QWidget):
 
         menu.addSeparator()
 
+        rua_action = QAction("rua", self)
+        rua_action.triggered.connect(self._rua)
+        menu.addAction(rua_action)
+
+        menu.addSeparator()
+
         exit_action = QAction("退出", self)
         exit_action.triggered.connect(QApplication.quit)
         menu.addAction(exit_action)
@@ -709,6 +715,9 @@ class EdgeFloatingBlock(QWidget):
         dialog = SettingsDialog(self._config or {}, self)
         dialog.config_saved.connect(self._on_config_saved)
         dialog.exec_()
+
+    def _rua(self):
+        self._content_bar.show_content("ww 好舒服")
 
     def _on_config_saved(self, config):
         self._config = config
