@@ -28,6 +28,10 @@
  [Releases 页面](https://github.com/baizhou830/AxleTouch/releases)
 直接下载 `AxleTouch.zip`，解压后双击其中的exe即可。
 
+ **release分发太慢，需要本地打包？**
+ [请点此处](https://github.com/baizhou830/AxleTouch/releases/tag/v1.0)
+ 下载此release中的build.py以本地打包。
+
 ---
 
 ### 二次开发/调试
