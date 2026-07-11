@@ -6,7 +6,7 @@ from PyQt5.QtNetwork import QNetworkAccessManager, QNetworkRequest, QNetworkRepl
 PROVIDER_CONFIGS = {
     "stepfun": {
         "name": "阶跃星辰",
-        "base_url": "https://api.stepfun.com/v1",
+        "base_url": "https://api.stepfun.com/step_plan/v1",
         "default_model": "step-3.7-flash",
     },
     "bailian": {
