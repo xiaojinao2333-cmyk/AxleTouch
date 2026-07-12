@@ -1,4 +1,3 @@
-# schedule.py
 import random
 from datetime import datetime
 from PyQt5.QtCore import QObject, QTimer, pyqtSignal

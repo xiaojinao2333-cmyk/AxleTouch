@@ -1,7 +1,30 @@
 import json
+import re
+from datetime import datetime
 
 from PyQt5.QtCore import pyqtSignal, QUrl
 from PyQt5.QtNetwork import QNetworkAccessManager, QNetworkRequest, QNetworkReply
+
+from AIweb import SearchThread
+
+_TOOL_CALL_RE = re.compile(
+    r'<tool_call>\s*<function=(\w+)>(.*?)</function>\s*</tool_call>',
+    re.DOTALL,
+)
+_PARAM_RE = re.compile(r'<parameter=(\w+)>(.*?)</parameter>', re.DOTALL)
+
+
+def _parse_xml_tool_call(content):
+    """从 content 中解析 <tool_call> XML。返回 (func_name, args_dict, remaining_text) 或 None。"""
+    m = _TOOL_CALL_RE.search(content)
+    if not m:
+        return None
+    func_name = m.group(1)
+    args = {}
+    for pm in _PARAM_RE.finditer(m.group(2)):
+        args[pm.group(1)] = pm.group(2).strip()
+    remaining = (content[:m.start()] + content[m.end():]).strip()
+    return func_name, args, remaining
 
 PROVIDER_CONFIGS = {
     "stepfun": {
@@ -22,18 +45,24 @@ PROVIDER_CONFIGS = {
 }
 
 def Client_creater(config):
-    return AIClient(config.get("provider", "stepfun"), config.get("api_key", ""))
+    return AIClient(
+        config.get("provider", "stepfun"),
+        config.get("api_key", ""),
+        config.get("tavily_api_key", ""),
+    )
 
 
 class AIClient(QNetworkAccessManager):
 
     response_ready = pyqtSignal(str)
 
-    def __init__(self, provider, api_key):
+    def __init__(self, provider, api_key, tavily_api_key=""):
         super().__init__()
         self._provider = provider
         self._api_key = api_key
+        self._tavily_api_key = tavily_api_key
         self._messages = []
+        self._web_searched = False  
 
     @property
     def _cfg(self):
@@ -42,16 +71,18 @@ class AIClient(QNetworkAccessManager):
     def set_system_prompt(self, prompt):
         self._messages = [{"role": "system", "content": prompt}]
 
-    def update(self, provider, api_key):
+    def update(self, provider, api_key, tavily_api_key=""):
         self._provider = provider
         self._api_key = api_key
+        self._tavily_api_key = tavily_api_key
         self._messages = [self._messages[0]] if self._messages else []
 
     def send_message(self, user_message):
         self._messages.append({"role": "user", "content": user_message})
+        self._web_searched = False
         self._do_request()
 
-    def _do_request(self):
+    def _do_request(self, with_tools=True):
         if not self._api_key:
             self.response_ready.emit("呜...还没设置 API Key 呢！去设置里填一下啦笨蛋~")
             return
@@ -62,8 +93,25 @@ class AIClient(QNetworkAccessManager):
             "temperature": 1,
             "stream": False
         }
-        raw = json.dumps(body, ensure_ascii=False).encode("utf-8")
 
+        if with_tools and self._tavily_api_key:
+            body["tools"] = [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "search_web",
+                        "description": "当用户询问实时信息、新闻或天气时，调用此工具进行网络搜索。",
+                        "parameters": {
+                         "type": "object",
+                            "properties": {
+                                "query": {"type": "string", "description": "要搜索的关键词"}
+                            }
+                        }
+                    }
+                }
+            ]
+
+        raw = json.dumps(body, ensure_ascii=False).encode("utf-8")
         req = QNetworkRequest(QUrl(f"{self._cfg['base_url']}/chat/completions"))
         req.setHeader(QNetworkRequest.ContentTypeHeader, "application/json")
         req.setRawHeader(b"Authorization", f"Bearer {self._api_key}".encode())
@@ -72,17 +120,103 @@ class AIClient(QNetworkAccessManager):
 
     def _on_reply(self, reply):
         try:
-            if reply.error() != QNetworkReply.NoError:
-                self.response_ready.emit(f"呜...网络错误: {reply.errorString()}")
-                reply.deleteLater()
-                return
-
             raw = reply.readAll().data().decode()
             data = json.loads(raw)
-            content = data["choices"][0]["message"]["content"]
-            self._messages.append({"role": "assistant", "content": content})
-            self.response_ready.emit(content)
+            if 'choices' not in data:
+                err_msg = data.get('error', {}).get('message', '') or raw[:200]
+                self.response_ready.emit(f"呜...API 报错: {err_msg}")
+                return
+            choice = data['choices'][0]
+            finish_reason = choice.get('finish_reason')
+            message = choice['message']
+
+            if finish_reason == 'tool_calls':
+                if message.get('content') is None:
+                    message['content'] = ''
+                self._messages.append(message)
+
+                tool_call = message['tool_calls'][0]
+                func_name = tool_call['function']['name']
+                args = json.loads(tool_call['function']['arguments'])
+                query = args.get('query')
+
+                print(" -----[ Action ]----- ", "\n",
+                      "[", datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "]", "\n",
+                      "调用", func_name)
+                self._web_searched = True
+
+                if func_name == 'search_web':
+                    self.search_thread = SearchThread(
+                        api_key=self._tavily_api_key, query=query
+                    )
+                    self.search_thread.result_ready.connect(self._on_search_result)
+                    self.search_thread.error_occurred.connect(self._on_search_error)
+                    self.search_thread.start()
+                return
+
+            content = message.get('content', '') or ''
+            parsed = _parse_xml_tool_call(content)
+            if parsed:
+                func_name, args, remaining = parsed
+                query = args.get('query')
+                if func_name == 'search_web' and self._tavily_api_key and query:
+                    print(" -----[ Action ]----- ", "\n",
+                          "[", datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "]", "\n",
+                          "调用", func_name, "(xml)")
+                    self._web_searched = True
+                    tool_call_id = f"xml_{datetime.now().strftime('%H%M%S%f')}"
+                    self._messages.append({
+                        "role": "assistant",
+                        "content": remaining or "",
+                        "tool_calls": [{
+                            "id": tool_call_id,
+                            "type": "function",
+                            "function": {
+                                "name": func_name,
+                                "arguments": json.dumps(args, ensure_ascii=False),
+                            },
+                        }],
+                    })
+                    self.search_thread = SearchThread(
+                        api_key=self._tavily_api_key, query=query
+                    )
+                    self.search_thread.result_ready.connect(self._on_search_result)
+                    self.search_thread.error_occurred.connect(self._on_search_error)
+                    self.search_thread.start()
+                    return
+                content = remaining
+
+            if content:
+                self._messages.append({"role": "assistant", "content": content})
+                if self._web_searched:
+                    content = f"[web search]{content}"
+                self._web_searched = False
+                self.response_ready.emit(content)
+
         except Exception as e:
             self.response_ready.emit(f"呜...解析失败: {e}")
         finally:
             reply.deleteLater()
+
+
+    def _on_search_result(self, result_text):
+        last_msg = self._messages[-1]
+        tool_call = last_msg['tool_calls'][0]
+
+        tool_response = {
+            "role": "tool",
+            "tool_call_id": tool_call['id'],
+            "content": result_text
+        }
+        self._messages.append(tool_response)
+
+        self._do_request()
+
+    def _on_search_error(self, error_msg):
+        tool_response = {
+            "role": "tool",
+            "tool_call_id": self._messages[-1]['tool_calls'][0]['id'],
+            "content": f"搜索失败: {error_msg}"
+        }
+        self._messages.append(tool_response)
+        self._do_request()

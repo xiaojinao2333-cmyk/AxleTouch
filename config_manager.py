@@ -14,9 +14,11 @@ DEFAULT_PROMPT = (
     "不要过多使用emoji。语言模式不要过于AI，不要过多热情。以下是用户的一些状态："
 )
 
+
 DEFAULT_CONFIG = {
     "provider": "stepfun",
     "api_key": "",
+    "tavily_api_key": "",   
     "icon_size": 100,
     "popup_width": 420,
     "prompt": DEFAULT_PROMPT,

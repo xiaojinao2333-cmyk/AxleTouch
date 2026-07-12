@@ -401,7 +401,7 @@ class SettingsDialog(QDialog):
         super().__init__(parent)
         self._config = config.copy()
         self.setWindowTitle("设置")
-        self.setFixedSize(420, 300)
+        self.setFixedSize(420, 340)
         self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)
         self.setAttribute(Qt.WA_TranslucentBackground, False)
         self.init_ui()
@@ -428,6 +428,11 @@ class SettingsDialog(QDialog):
         self._api_key_edit.setStyleSheet(INPUT_STYLE)
         self._api_key_edit.setPlaceholderText("输入 API Key")
         form.addRow(self._label("API Key:"), self._api_key_edit)
+
+        self._tavily_key_edit = QLineEdit(self._config.get("tavily_api_key", ""))
+        self._tavily_key_edit.setStyleSheet(INPUT_STYLE)
+        self._tavily_key_edit.setPlaceholderText("输入 Tavily API Key（可留空）")
+        form.addRow(self._label("Tavily Key:"), self._tavily_key_edit)
 
         self._icon_size_spin = QSpinBox(self)
         self._icon_size_spin.setStyleSheet(SPIN_STYLE)
@@ -464,12 +469,14 @@ class SettingsDialog(QDialog):
     def _on_save(self):
         provider = self._provider_combo.currentData()
         api_key = self._api_key_edit.text().strip()
+        tavily_api_key = self._tavily_key_edit.text().strip()
         icon_size = self._icon_size_spin.value()
         popup_width = self._popup_width_spin.value()
         prompt = self._prompt_edit.text().strip()
-    
+
         self._config["provider"] = provider
         self._config["api_key"] = api_key
+        self._config["tavily_api_key"] = tavily_api_key
         self._config["icon_size"] = icon_size
         self._config["popup_width"] = popup_width
         self._config["prompt"] = prompt
@@ -724,6 +731,7 @@ class EdgeFloatingBlock(QWidget):
             self._ai.update(
                 config.get("provider", "stepfun"),
                 config.get("api_key", ""),
+                config.get("tavily_api_key", ""),
             )
 
     def _card_rect(self):
@@ -781,3 +789,4 @@ class EdgeFloatingBlock(QWidget):
     ]
         if self._ai:
             self._ai.send_message(data)
+
