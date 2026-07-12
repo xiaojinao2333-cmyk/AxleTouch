@@ -567,7 +567,7 @@ class EdgeFloatingBlock(QWidget):
     def _on_input_submitted(self, text):
         print(" -----[ user input ]----- ", "\n",
               "[", datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "]", "\n",
-              "\"", text, "\"")
+              "\"", text, "\"","\n")
         if self._ai:
             self._ai.send_message(text)
 
@@ -716,7 +716,7 @@ class EdgeFloatingBlock(QWidget):
         #此处不复用_image其实是有说法的 image发送路径的可自定义性太低。
         print(" -----[ Action ]----- ", "\n",
               "[", datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "]", "\n",
-              "\"", "雨竹看了一眼你的屏幕", "\"")
+              "\"", "雨竹看了一眼你的屏幕", "\"","\n")
         _data = [
             {"type": "text", "text": "这是用户桌面截图。"},
             {"type": "image_url", "image_url": {"url": image_url, "detail": "high"}}
@@ -783,7 +783,7 @@ class EdgeFloatingBlock(QWidget):
     def _image(self,data):
         print(" -----[ user input ]----- ", "\n",
               "[", datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "]", "\n",
-              "\"", "图片", "\"")
+              "\"", "图片", "\"",'\n')
         data = [
         {"type": "image_url", "image_url": {"url": data,"detail":"high"}}
     ]

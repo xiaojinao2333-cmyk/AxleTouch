@@ -142,7 +142,7 @@ class AIClient(QNetworkAccessManager):
 
                 print(" -----[ Action ]----- ", "\n",
                       "[", datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "]", "\n",
-                      "调用", func_name)
+                      "调用", func_name,'\n')
                 self._web_searched = True
 
                 if func_name == 'search_web':
@@ -162,7 +162,7 @@ class AIClient(QNetworkAccessManager):
                 if func_name == 'search_web' and self._tavily_api_key and query:
                     print(" -----[ Action ]----- ", "\n",
                           "[", datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "]", "\n",
-                          "调用", func_name, "(xml)")
+                          "调用", func_name, "(xml)",'\n')
                     self._web_searched = True
                     tool_call_id = f"xml_{datetime.now().strftime('%H%M%S%f')}"
                     self._messages.append({
