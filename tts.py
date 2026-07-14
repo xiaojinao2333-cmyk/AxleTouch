@@ -3,7 +3,7 @@ import requests
 
 TTS_URL = "https://api.stepfun.com/step_plan/v1/audio/speech"
 TTS_MODEL = "stepaudio-2.5-tts"
-TTS_VOICE = "voice-tone-SgDyPmT8E4"
+TTS_VOICE = "ruanmengnvsheng"
 
 TTS_MAX_CHARS = 1000
 
