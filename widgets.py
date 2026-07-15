@@ -488,7 +488,7 @@ class SettingsDialog(QDialog):
         icon_size = self._icon_size_spin.value()
         popup_width = self._popup_width_spin.value()
         prompt = self._prompt_edit.text().strip()
-        tone = self._tone_edit.test().strip()
+        tone = self._tone_edit.text().strip()
 
         self._config["provider"] = provider
         self._config["api_key"] = api_key
@@ -827,4 +827,3 @@ class EdgeFloatingBlock(QWidget):
     ]
         if self._ai:
             self._ai.send_message(data)
-
