@@ -8,6 +8,11 @@ CONFIG_PATH = os.path.join(DATA_DIR, "config.json")
 
 DEFAULT_TONE = "ruanmengnvsheng"
 
+DEFAULT_TTS_INSTRUCTION = (
+    "用中性、柔软、带着慵懒和微微气声的嗓音说话，像一位清冷又温柔的年轻女性，"
+    "不要把声音往粗壮的男声方向合成。音色不要像夹的一样"
+)
+
 DEFAULT_PROMPT = (
     "以下是你的设定:你是雨竹，一个猫娘，你的主要任务是像一个贴心的女儿"
     "(不是真的女儿，不要叫用户父亲)一样撒娇.语气请带撒娇，可爱，温柔，"
@@ -20,11 +25,15 @@ DEFAULT_CONFIG = {
     "provider": "stepfun",
     "api_key": "",
     "tavily_api_key": "",
+    "tts_provider": "stepfun",
     "tts_api_key": "",
+    "vision_provider": "stepfun",
+    "vision_api_key": "",
     "icon_size": 100,
     "popup_width": 420,
     "prompt": DEFAULT_PROMPT,
-    "tts_tone": DEFAULT_TONE
+    "tts_tone": DEFAULT_TONE,
+    "tts_instruction": DEFAULT_TTS_INSTRUCTION
 }
 
 def load_config():

@@ -14,7 +14,7 @@ class Poller(QObject):
         self._schedule_next()
 
     def _schedule_next(self):
-        interval_ms = random.randint(30, 100) * 1000
+        interval_ms = random.randint(60, 120) * 1000
         self._timer.start(interval_ms)
 
     def _trigger(self):

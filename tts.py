@@ -1,15 +1,18 @@
 from PyQt5.QtCore import QThread, pyqtSignal
 import requests
-from config_manager import load_config 
-TTS_URL = "https://api.stepfun.com/step_plan/v1/audio/speech"
-TTS_MODEL = "stepaudio-2.5-tts"
+from config_manager import load_config
+
+TTS_PROVIDER_CONFIGS = {
+    "stepfun": {
+        "name": "阶跃星辰",
+        "url": "https://api.stepfun.com/step_plan/v1/audio/speech",
+        "model": "stepaudio-2.5-tts",
+        "default_voice": "ruanmengnvsheng",
+    },
+}
+
 D_TTS_VOICE = "ruanmengnvsheng"
-
 TTS_MAX_CHARS = 1000
-
-config = load_config()
-TTS_VOICE  = config.get("tts_tone",D_TTS_VOICE)
-
 
 
 class TTSThread(QThread):
@@ -17,10 +20,12 @@ class TTSThread(QThread):
     audio_ready = pyqtSignal(bytes)
     error_occurred = pyqtSignal(str)
 
-    def __init__(self, api_key, text):
+    def __init__(self, api_key, text, tts_provider=None):
         super().__init__()
         self.api_key = api_key
         self.text = text
+
+        self.tts_provider = tts_provider or load_config().get("tts_provider", "stepfun")
 
     def run(self):
         if not self.api_key:
@@ -30,20 +35,31 @@ class TTSThread(QThread):
             self.error_occurred.emit("TTS 文本为空")
             return
 
+        cfg = load_config()
+        provider = self.tts_provider
+        if provider not in TTS_PROVIDER_CONFIGS:
+            self.error_occurred.emit(f"不支持的 TTS 厂商: {provider}")
+            return
+
+        pcfg = TTS_PROVIDER_CONFIGS[provider]
+        voice = cfg.get("tts_tone", D_TTS_VOICE) or D_TTS_VOICE
+        instruction = cfg.get("tts_instruction", "") or ""
+
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {self.api_key}",
         }
         payload = {
-            "model": TTS_MODEL,
+            "model": pcfg["model"],
             "input": self.text[:TTS_MAX_CHARS],
-            "voice": TTS_VOICE,
+            "voice": voice,
             "response_format": "wav",
-            "instruction": "用中性、柔软、带着慵懒和微微气声的嗓音说话，像一位清冷又温柔的年轻女性，不要把声音往粗壮的男声方向合成。音色不要像夹的一样、"
         }
+        if instruction.strip():
+            payload["instruction"] = instruction.strip()
         try:
             response = requests.post(
-                TTS_URL, json=payload, headers=headers, timeout=30
+                pcfg["url"], json=payload, headers=headers, timeout=30
             )
             response.raise_for_status()
             audio_data = response.content

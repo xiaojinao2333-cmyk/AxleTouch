@@ -15,7 +15,6 @@ _PARAM_RE = re.compile(r'<parameter=(\w+)>(.*?)</parameter>', re.DOTALL)
 
 
 def _parse_xml_tool_call(content):
-    """从 content 中解析 <tool_call> XML。返回 (func_name, args_dict, remaining_text) 或 None。"""
     m = _TOOL_CALL_RE.search(content)
     if not m:
         return None
@@ -200,6 +199,9 @@ class AIClient(QNetworkAccessManager):
 
 
     def _on_search_result(self, result_text):
+        if not self._messages or 'tool_calls' not in self._messages[-1] or not self._messages[-1]['tool_calls']:
+            self.response_ready.emit(f"[网络搜索结果] {result_text}")
+            return
         last_msg = self._messages[-1]
         tool_call = last_msg['tool_calls'][0]
 
@@ -213,6 +215,9 @@ class AIClient(QNetworkAccessManager):
         self._do_request()
 
     def _on_search_error(self, error_msg):
+        if not self._messages or 'tool_calls' not in self._messages[-1] or not self._messages[-1]['tool_calls']:
+            self.response_ready.emit(f"搜索失败: {error_msg}")
+            return
         tool_response = {
             "role": "tool",
             "tool_call_id": self._messages[-1]['tool_calls'][0]['id'],

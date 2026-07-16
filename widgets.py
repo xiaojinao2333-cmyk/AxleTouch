@@ -12,14 +12,18 @@ from tts import TTSThread
 
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout,
                               QLineEdit, QPushButton, QLabel, QApplication,
-                              QMenu, QAction, QDialog)
-from PyQt5.QtCore import (Qt, QPoint, QRectF, QPropertyAnimation,
-                           QEasingCurve, QTimer, pyqtSignal, QElapsedTimer,QBuffer)
+                              QMenu, QAction, QDialog, QStackedWidget)
+from PyQt5.QtCore import (Qt, QPoint, QRect, QRectF, QPropertyAnimation,
+                           QEasingCurve, QTimer, pyqtSignal, pyqtProperty,
+                           QElapsedTimer, QBuffer)
 from PyQt5.QtGui import (QPainter, QBrush, QColor, QPen, QPainterPath,
-                          QRegion, QCursor, QFontMetrics, QPixmap)
+                          QRegion, QCursor, QFontMetrics, QPixmap, QFont)
 
 from tools import _log_to_json, get_base_path, capture_screen
-from setting import SettingPage
+from setting import (AboutPage, LLMSettingPage, TTSSettingPage,
+                     WebSearchSettingPage, VisionSettingPage)
+from config_manager import load_config, save_config
+from AIclient import AIClient
 
 
 current_dir = get_base_path()
@@ -334,21 +338,106 @@ class InputPopup(QWidget):
             event.acceptProposedAction()  
 
     def dropEvent(self, event):
-        config = load_config()
-        if config.get("provider") != "stepfun":
-            self.no_vlm.emit()
         urls = event.mimeData().urls()
-        if urls:
-            file_path = urls[0].toLocalFile()
-            if file_path.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.gif')):
-                with open(file_path, "rb") as image_file:
-                    base64_bytes = base64.b64encode(image_file.read()).decode('utf-8')
-                    image_data = f"data:image/{Path(file_path).suffix[1:].lower()};base64,{base64_bytes}"
-                    self.image.emit(image_data)
-            else:
-                self.not_image.emit()
+        if not urls:
+            return
+        file_path = urls[0].toLocalFile()
+        if not file_path.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.gif')):
+            self.not_image.emit()
+            return
+        with open(file_path, "rb") as image_file:
+            base64_bytes = base64.b64encode(image_file.read()).decode('utf-8')
+            image_data = f"data:image/{Path(file_path).suffix[1:].lower()};base64,{base64_bytes}"
+            self.image.emit(image_data)
 
 
+SIDEBAR_WIDTH = 56
+SIDEBAR_ITEM_H = 44
+INDICATOR_H = 36
+INDICATOR_W = 4
+
+
+class SidebarItem(QWidget):
+    def __init__(self, text, parent=None):
+        super().__init__(parent)
+        self.selected = False
+        self.hovered = False
+        self.setFixedHeight(SIDEBAR_ITEM_H)
+        self.setCursor(QCursor(Qt.PointingHandCursor))
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+
+        spacer = QWidget()
+        spacer.setFixedWidth(4)
+        layout.addWidget(spacer)
+
+        self.label = QLabel(text)
+        self.label.setFont(QFont("Microsoft YaHei", 9))
+        self.label.setAlignment(Qt.AlignCenter)
+        self.label.setStyleSheet("color: #787d88;")
+
+        layout.addWidget(self.label, stretch=1)
+
+    def set_selected(self, sel):
+        self.selected = sel
+        if sel:
+            self.label.setStyleSheet("color: #1e2026; font-weight: bold;")
+        else:
+            self.label.setStyleSheet("color: #787d88;")
+
+    def enterEvent(self, event):
+        self.hovered = True
+        self.update()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self.hovered = False
+        self.update()
+        super().leaveEvent(event)
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        if self.hovered and not self.selected:
+            painter.setBrush(QBrush(QColor(241, 243, 248)))
+            painter.setPen(Qt.NoPen)
+            painter.drawRoundedRect(self.rect().adjusted(6, 3, -6, -3), 8, 8)
+        painter.end()
+        super().paintEvent(event)
+
+
+class SidebarIndicator(QWidget):
+    """侧边栏滑动指示条，用 pyqtProperty 驱动动画"""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._indicator_y = 16.0
+        self._anim = None
+
+    def get_indicator_y(self):
+        return self._indicator_y
+
+    def set_indicator_y(self, y):
+        self._indicator_y = y
+        self.update()
+
+    indicator_y = pyqtProperty(float, get_indicator_y, set_indicator_y)
+
+    def move_to(self, y):
+        self._anim = QPropertyAnimation(self, b"indicator_y")
+        self._anim.setDuration(200)
+        self._anim.setStartValue(self._indicator_y)
+        self._anim.setEndValue(float(y))
+        self._anim.setEasingCurve(QEasingCurve.InOutCubic)
+        self._anim.start()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setBrush(QBrush(QColor(80, 120, 240)))
+        painter.setPen(Qt.NoPen)
+        painter.drawRoundedRect(QRectF(0, self._indicator_y, INDICATOR_W, INDICATOR_H), 2, 2)
 
 
 class SettingsDialog(QDialog):
@@ -356,12 +445,13 @@ class SettingsDialog(QDialog):
 
     def __init__(self, config, parent=None):
         super().__init__(parent)
-        self._config = config.copy() if config else {}
+        self._config = {**load_config(), **(config or {})}
         self._drag_pos = None
         self.setWindowTitle("AxleTouch")
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.Tool)
         self.setAttribute(Qt.WA_TranslucentBackground)
-        self.setFixedSize(420, 650)
+        self.setFixedSize(640, 560)
+        self._pages = []
         self.init_ui()
 
     def init_ui(self):
@@ -380,7 +470,7 @@ class SettingsDialog(QDialog):
         top_layout.addWidget(title)
         top_layout.addStretch()
 
-        self.ok_btn = QPushButton("Yes")
+        self.ok_btn = QPushButton("确定")
         self.ok_btn.setFixedSize(56, 32)
         self.ok_btn.setCursor(QCursor(Qt.PointingHandCursor))
         self.ok_btn.setStyleSheet("""
@@ -393,7 +483,7 @@ class SettingsDialog(QDialog):
         self.ok_btn.clicked.connect(self._on_save)
         top_layout.addWidget(self.ok_btn)
 
-        self.cancel_btn = QPushButton("Cancel")
+        self.cancel_btn = QPushButton("取消")
         self.cancel_btn.setFixedSize(56, 32)
         self.cancel_btn.setCursor(QCursor(Qt.PointingHandCursor))
         self.cancel_btn.setStyleSheet("""
@@ -414,17 +504,100 @@ class SettingsDialog(QDialog):
         divider.setFixedHeight(1)
         divider.setStyleSheet("background: #ebedf1;")
         outer.addWidget(divider)
-        self._about_page = SettingPage(config=self._config)
-        outer.addWidget(self._about_page, stretch=1)
+
+        body = QHBoxLayout()
+        body.setContentsMargins(0, 0, 0, 0)
+        body.setSpacing(0)
+
+        self.sidebar = QWidget()
+        self.sidebar.setFixedWidth(SIDEBAR_WIDTH)
+        self.sidebar.setStyleSheet("background: transparent;")
+        side_layout = QVBoxLayout(self.sidebar)
+        side_layout.setContentsMargins(0, 16, 0, 16)
+        side_layout.setSpacing(2)
+
+        self.sidebar_items = []
+        self.stack = QStackedWidget()
+        self.stack.setStyleSheet("background: transparent;")
+        self._add_page("关于", AboutPage(self._config))
+        self._add_page("LLM", LLMSettingPage(self._config))
+        self._add_page("TTS", TTSSettingPage(self._config))
+        self._add_page("搜索", WebSearchSettingPage(self._config))
+        self._add_page("识图", VisionSettingPage(self._config))
+        self.sidebar.layout().addStretch()
+
+        self.sidebar_indicator = SidebarIndicator(self.sidebar)
+        self.sidebar_indicator.setAttribute(Qt.WA_TransparentForMouseEvents)
+        self.sidebar_indicator.setGeometry(0, 0, SIDEBAR_WIDTH, self.sidebar.height())
+
+        body.addWidget(self.sidebar)
+
+        side_div = QWidget()
+        side_div.setFixedWidth(1)
+        side_div.setStyleSheet("background: #ebedf1;")
+        body.addWidget(side_div)
+
+        body.addWidget(self.stack, stretch=1)
+        outer.addLayout(body, stretch=1)
+
+        self.sidebar_items[0].set_selected(True)
+        self.stack.setCurrentIndex(0)
+        QTimer.singleShot(50, self._init_indicator_pos)
+
+    def _add_page(self, name, page):
+        item = SidebarItem(name)
+        idx = len(self.sidebar_items)
+        item.mousePressEvent = lambda e, i=idx: self._on_sidebar(i)
+        self.sidebar_items.append(item)
+        side_layout = self.sidebar.layout()
+        side_layout.addWidget(item)
+        if idx < 4:
+            div = QWidget()
+            div.setFixedHeight(1)
+            div.setFixedWidth(32)
+            div.setStyleSheet("background: #e0e2e8;")
+            side_layout.addWidget(div, alignment=Qt.AlignCenter)
+        self.stack.addWidget(page)
+        self._pages.append(page)
+
+    def _init_indicator_pos(self):
+        if self.sidebar_items:
+            item = self.sidebar_items[0]
+            self.sidebar_indicator._indicator_y = float(item.y() + (SIDEBAR_ITEM_H - INDICATOR_H) / 2)
+            self.sidebar_indicator.update()
+
+    def _on_sidebar(self, idx):
+        if idx == self.stack.currentIndex():
+            return
+        for i, item in enumerate(self.sidebar_items):
+            item.set_selected(i == idx)
+        target = self.sidebar_items[idx]
+        self.sidebar_indicator.move_to(target.y() + (SIDEBAR_ITEM_H - INDICATOR_H) / 2)
+        self.stack.setCurrentIndex(idx)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        path = QPainterPath()
+        path.addRoundedRect(QRectF(self.rect()), 12, 12)
+        self.setMask(QRegion(path.toFillPolygon().toPolygon()))
+        if hasattr(self, 'sidebar_indicator'):
+            self.sidebar_indicator.setGeometry(0, 0, self.sidebar.width(), self.sidebar.height())
 
     def _on_save(self):
-        new_config = self._about_page.save_config_values()
-        self._config = new_config
-        self.config_saved.emit(new_config)
+        patch = {}
+        for p in self._pages:
+            if hasattr(p, "save_values"):
+                patch.update(p.save_values())
+        self._config.update(patch)
+        save_config(self._config)
+        self.config_saved.emit(self._config)
         self.accept()
 
     def _on_cancel(self):
-        self._about_page.reload_config_values()
+        disk_cfg = load_config()
+        for p in self._pages:
+            if hasattr(p, "reload_values"):
+                p.reload_values(disk_cfg)
         self.reject()
 
     def mousePressEvent(self, event):
@@ -460,17 +633,18 @@ class SettingsDialog(QDialog):
             painter.setPen(Qt.NoPen)
             painter.drawRoundedRect(r, radius + offset, radius + offset)
 
-
         painter.setBrush(QBrush(QColor(251, 251, 253)))
         painter.setPen(QPen(QColor(230, 232, 236), 0.5))
         painter.drawRoundedRect(card, radius, radius)
 
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        path = QPainterPath()
-        path.addRoundedRect(QRectF(self.rect()), 12, 12)
-        self.setMask(QRegion(path.toFillPolygon().toPolygon()))
 
+        if hasattr(self, 'sidebar'):
+            painter.setClipRect(card, Qt.IntersectClip)
+            side_w = SIDEBAR_WIDTH
+            side_rect = QRectF(card.left(), card.top(), side_w, card.height())
+            painter.setBrush(QBrush(QColor(246, 247, 249)))
+            painter.setPen(Qt.NoPen)
+            painter.drawRoundedRect(side_rect, radius, radius)
 
 
 class EdgeFloatingBlock(QWidget):
@@ -502,6 +676,8 @@ class EdgeFloatingBlock(QWidget):
                                    Qt.KeepAspectRatio, Qt.SmoothTransformation)
 
         self._ai = None
+        self._vision_ai = None  
+        self._vision_busy = False  
         self._config = None
 
         self._poller = Poller(self) 
@@ -697,6 +873,38 @@ class EdgeFloatingBlock(QWidget):
         dialog.config_saved.connect(self._on_config_saved)
         dialog.exec_()
 
+    def _resolve_vision_creds(self):
+        vision_provider = self._config.get("vision_provider", "stepfun")
+        vision_key = self._config.get("vision_api_key", "")
+        if not vision_key:
+            vision_key = self._config.get("api_key", "")
+        if not vision_key:
+            return None
+        return vision_provider, vision_key
+
+    def _send_to_vision(self, image_url, prompt_text):
+        if self._vision_busy:
+            print("识图忙碌：上一次请求尚未返回，已忽略本次图片")
+            return
+        creds = self._resolve_vision_creds()
+        if creds is None:
+            print("识图失败：未配置识图 API Key")
+            self._content_bar.show_content("没有识图 API Key 哦，去设置里填一下~")
+            return
+        vision_provider, vision_key = creds
+        _data = [
+            {"type": "text", "text": prompt_text},
+            {"type": "image_url", "image_url": {"url": image_url, "detail": "high"}}
+        ]
+        if self._vision_ai is None:
+            self._vision_ai = AIClient(vision_provider, vision_key, "")
+            self._vision_ai.response_ready.connect(self._on_vision_describe)
+        else:
+            self._vision_ai.update(vision_provider, vision_key, "")
+        self._vision_ai.set_system_prompt("你是图像描述助手。请用中文客观、准确地描述图片内容，不要加入个人情感或对话语气。")
+        self._vision_busy = True
+        self._vision_ai.send_message(_data)
+
     def _capture(self):
         try:
             pixmap = capture_screen()
@@ -707,23 +915,30 @@ class EdgeFloatingBlock(QWidget):
         if pixmap.isNull():
             print("截图失败：获取的图像无效")
             return
-        
+
         buffer = QBuffer()
         buffer.open(QBuffer.ReadWrite)
         pixmap = pixmap.scaled(1280, 720, Qt.KeepAspectRatio, Qt.SmoothTransformation)
         pixmap.save(buffer, "PNG")
         data = buffer.data().toBase64().data().decode()
         image_url = f"data:image/png;base64,{data}"
-        #此处不复用_image其实是有说法的 image发送路径的可自定义性太低。
         print(" -----[ Action ]----- ", "\n",
               "[", datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "]", "\n",
               "\"", "雨竹看了一眼你的屏幕", "\"","\n")
-        _data = [
-            {"type": "text", "text": "这是用户桌面截图。"},
-            {"type": "image_url", "image_url": {"url": image_url, "detail": "high"}}
-        ]
-        if self._ai:
-            self._ai.send_message(_data)
+        self._send_to_vision(
+            image_url,
+            "请客观、简洁地描述这张屏幕截图的内容，包括可见的窗口、文字、界面元素等。描述将交给主AI作为上下文。"
+        )
+
+    def _on_vision_describe(self, description):
+        self._vision_busy = False
+        if self._vision_ai is not None:
+            self._vision_ai.set_system_prompt("")
+        if self._ai is not None:
+            user_msg = f"我刚发了一张屏幕截图给你，以下是图片内容描述：\n{description}\n请基于这个描述回复我。"
+            self._ai.send_message(user_msg)
+        else:
+            self._on_ai_response(description)
 
     def _on_config_saved(self, config):
         self._config = config
@@ -733,6 +948,13 @@ class EdgeFloatingBlock(QWidget):
                 config.get("provider", "stepfun"),
                 config.get("api_key", ""),
                 config.get("tavily_api_key", ""),
+            )
+
+        if self._vision_ai is not None:
+            self._vision_ai.update(
+                config.get("vision_provider", "stepfun"),
+                config.get("vision_api_key", "") or config.get("api_key", ""),
+                "",
             )
 
     def _card_rect(self):
@@ -755,12 +977,6 @@ class EdgeFloatingBlock(QWidget):
         painter.setBrush(QBrush(QColor(251, 251, 253)))
         painter.setPen(QPen(QColor(230, 232, 236), 0.5))
         painter.drawRoundedRect(card, 18, 18)
-
-        painter.setPen(QPen(QColor(100, 105, 115)))
-        painter.setFont(painter.font())
-        font = painter.font()
-        font.setPixelSize(int(card.height() * 0.45))
-        painter.setFont(font)
 
         painter.save()
         clip_path = QPainterPath()
@@ -785,8 +1001,7 @@ class EdgeFloatingBlock(QWidget):
         print(" -----[ user input ]----- ", "\n",
               "[", datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "]", "\n",
               "\"", "图片", "\"",'\n')
-        data = [
-        {"type": "image_url", "image_url": {"url": data,"detail":"high"}}
-    ]
-        if self._ai:
-            self._ai.send_message(data)
+        self._send_to_vision(
+            data,
+            "请客观、简洁地描述这张图片的内容。描述将交给主AI作为上下文。"
+        )

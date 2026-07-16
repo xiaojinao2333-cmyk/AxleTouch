@@ -1,11 +1,13 @@
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QLabel,
-                             QGroupBox, QLineEdit,
-                             QComboBox, QSpinBox, QFormLayout)
+                             QGroupBox, QLineEdit, QComboBox, QFormLayout,
+                             QTextEdit)
 
 from config_manager import load_config, save_config
 
 
-STYLE = """
+# ---------- 共用样式 ----------
+
+GROUP_STYLE = """
     QGroupBox {
         border: 1px solid #ebedf1;
         border-radius: 8px; margin-top: 12px;
@@ -36,13 +38,13 @@ INPUT_STYLE = """
     QLineEdit:focus { border-color: #5078f0; }
 """
 
-SPIN_STYLE = """
-    QSpinBox {
+TEXT_STYLE = """
+    QTextEdit {
         border: 1px solid #ebedf1;
         border-radius: 6px; padding: 4px 8px;
         background: white; color: #1e2026; font-size: 12px;
-        min-width: 60px;
     }
+    QTextEdit:focus { border-color: #5078f0; }
 """
 
 # 厂商列表（id, 显示名）
@@ -52,61 +54,84 @@ PROVIDER_OPTIONS = [
     ("deepseek", "DeepSeek"),
 ]
 
-class SettingPage(QWidget):
-    def __init__(self, config=None, parent=None):
+VLM_PROVIDER_OPTIONS = [
+    ("stepfun", "阶跃星辰")
+]
+
+
+TTS_PROVIDER_OPTIONS = [
+    ("stepfun", "阶跃星辰"),
+]
+
+
+
+class BaseSettingPage(QWidget):
+    def __init__(self, config, parent=None):
         super().__init__(parent)
-        # 嵌入对话框时使用透明背景，避免遮挡卡片圆角与阴影
-        if config is not None:
-            self._config = {**load_config(), **config}
-        else:
-            self._config = load_config()
-        self.init_ui()
+        self._config = config
+        self._build()
 
-    def showEvent(self, event):
-        super().showEvent(event)
-        if hasattr(self, 'refresh'):
-            self.refresh()
+    def _build(self):
+        raise NotImplementedError
 
-    def init_ui(self):
+    def save_values(self):
+        return {}
+
+    def reload_values(self, cfg):
+        pass
+
+    @staticmethod
+    def _label(text):
+        lbl = QLabel(text)
+        lbl.setStyleSheet("color: #1e2026; font-size: 12px;")
+        return lbl
+
+
+class AboutPage(BaseSettingPage):
+    def _build(self):
         layout = QVBoxLayout(self)
-
-        layout.setContentsMargins(24, 12, 24, 16)
+        layout.setContentsMargins(24, 16, 24, 16)
         layout.setSpacing(12)
 
-
-        title = QLabel("关于与设置")
-        title.setStyleSheet("font-size: 28px; font-weight: bold; color: #1e2026;")
+        title = QLabel("关于 AxleTouch")
+        title.setStyleSheet("font-size: 22px; font-weight: bold; color: #1e2026;")
         layout.addWidget(title)
 
-        # 关于组
-        about_box = QGroupBox("关于 AxleTouch")
-        about_box.setStyleSheet(STYLE)
-        about_layout = QVBoxLayout(about_box)
-        about_layout.addWidget(QLabel("版本：1.6.0"))
-        about_layout.addWidget(QLabel("作者：Axlewire"))
-        about_layout.addWidget(QLabel("许可证：GPL v3"))
-        about_layout.addWidget(QLabel(" "))
-        about_layout.addWidget(QLabel("仓库主页：https://github.com/baizhou830/AxleTouch"))
-        about_layout.addWidget(QLabel("反馈建议：直接提Issue"))
-        layout.addWidget(about_box)
+        box = QGroupBox("关于")
+        box.setStyleSheet(GROUP_STYLE)
+        box_layout = QVBoxLayout(box)
+        box_layout.addWidget(QLabel("版本：1.6.0"))
+        box_layout.addWidget(QLabel("作者：Axlewire"))
+        box_layout.addWidget(QLabel("许可证：GPL v3"))
+        box_layout.addWidget(QLabel(" "))
+        box_layout.addWidget(QLabel("仓库主页：https://github.com/baizhou830/AxleTouch"))
+        box_layout.addWidget(QLabel("反馈建议：直接提 Issue"))
+        layout.addWidget(box)
+        layout.addStretch()
 
 
-        # 设置组
-        settings_box = QGroupBox("设置项")
-        settings_box.setStyleSheet(STYLE)
-        settings_layout = QVBoxLayout(settings_box)
-        settings_layout.setSpacing(8)
+class LLMSettingPage(BaseSettingPage):
+    def _build(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(24, 16, 24, 16)
+        layout.setSpacing(12)
+
+        title = QLabel("LLM 设置")
+        title.setStyleSheet("font-size: 22px; font-weight: bold; color: #1e2026;")
+        layout.addWidget(title)
+
+        box = QGroupBox("模型配置")
+        box.setStyleSheet(GROUP_STYLE)
+        box_layout = QVBoxLayout(box)
 
         form = QFormLayout()
-        form.setSpacing(8)
+        form.setSpacing(10)
 
         self._provider_combo = QComboBox(self)
         self._provider_combo.setStyleSheet(COMBO_STYLE)
         for pid, pname in PROVIDER_OPTIONS:
             self._provider_combo.addItem(pname, pid)
-        idx = self._provider_combo.findData(self._config.get("provider", "stepfun"))
-        if idx >= 0:
-            self._provider_combo.setCurrentIndex(idx)
+        self._set_provider(self._config.get("provider", "stepfun"))
         self._provider_combo.currentIndexChanged.connect(self._on_provider_changed)
         form.addRow(self._label("模型厂商:"), self._provider_combo)
 
@@ -115,80 +140,195 @@ class SettingPage(QWidget):
         self._api_key_edit.setPlaceholderText("输入 API Key")
         form.addRow(self._label("API Key:"), self._api_key_edit)
 
-        self._tavily_key_edit = QLineEdit(self._config.get("tavily_api_key", ""))
-        self._tavily_key_edit.setStyleSheet(INPUT_STYLE)
-        self._tavily_key_edit.setPlaceholderText("输入 Tavily API Key（可留空）")
-        form.addRow(self._label("Tavily Key:"), self._tavily_key_edit)
-
-        self._tts_key_edit = QLineEdit(self._config.get("tts_api_key", ""))
-        self._tts_key_edit.setStyleSheet(INPUT_STYLE)
-        self._tts_key_edit.setPlaceholderText("输入 StepFun TTS API Key（可留空）")
-        form.addRow(self._label("TTS Key:"), self._tts_key_edit)
-
-        self._icon_size_spin = QSpinBox(self)
-        self._icon_size_spin.setStyleSheet(SPIN_STYLE)
-        self._icon_size_spin.setRange(50, 300)
-        self._icon_size_spin.setValue(self._config.get("icon_size", 100))
-        self._icon_size_spin.setSuffix(" px")
-        form.addRow(self._label("图标大小:"), self._icon_size_spin)
-
-        self._popup_width_spin = QSpinBox(self)
-        self._popup_width_spin.setStyleSheet(SPIN_STYLE)
-        self._popup_width_spin.setRange(200, 800)
-        self._popup_width_spin.setValue(self._config.get("popup_width", 420))
-        self._popup_width_spin.setSuffix(" px")
-        form.addRow(self._label("输入框宽度:"), self._popup_width_spin)
-
         self._prompt_edit = QLineEdit(self._config.get("prompt", ""))
         self._prompt_edit.setStyleSheet(INPUT_STYLE)
-        self._prompt_edit.setPlaceholderText("自定义prompt")
-        form.addRow(self._label("prompt："), self._prompt_edit)
+        self._prompt_edit.setPlaceholderText("自定义 prompt")
+        form.addRow(self._label("Prompt:"), self._prompt_edit)
 
-        self._tone_edit = QLineEdit(self._config.get("tts_tone", ""))
-        self._tone_edit.setStyleSheet(INPUT_STYLE)
-        self._tone_edit.setPlaceholderText("自定义音色")
-        form.addRow(self._label("tone: "), self._tone_edit)
-
-        settings_layout.addLayout(form)
-
-        settings_layout.addStretch()
-
-        layout.addWidget(settings_box)
+        box_layout.addLayout(form)
+        layout.addWidget(box)
         layout.addStretch()
 
     def _on_provider_changed(self, idx):
         pname = self._provider_combo.currentText()
         self._api_key_edit.setPlaceholderText(f"输入 {pname} API Key")
 
-    def save_config_values(self):
-        self._config["provider"] = self._provider_combo.currentData()
-        self._config["api_key"] = self._api_key_edit.text().strip()
-        self._config["tavily_api_key"] = self._tavily_key_edit.text().strip()
-        self._config["tts_api_key"] = self._tts_key_edit.text().strip()
-        self._config["icon_size"] = self._icon_size_spin.value()
-        self._config["popup_width"] = self._popup_width_spin.value()
-        self._config["prompt"] = self._prompt_edit.text().strip()
-        self._config["tts_tone"] = self._tone_edit.text().strip()
-        save_config(self._config)
-        return self._config
-
-    def reload_config_values(self):
-        self._config = load_config()
-        idx = self._provider_combo.findData(self._config.get("provider", "stepfun"))
+    def _set_provider(self, pid):
+        idx = self._provider_combo.findData(pid)
         if idx >= 0:
             self._provider_combo.setCurrentIndex(idx)
-        self._api_key_edit.setText(self._config.get("api_key", ""))
-        self._tavily_key_edit.setText(self._config.get("tavily_api_key", ""))
-        self._tts_key_edit.setText(self._config.get("tts_api_key", ""))
-        self._icon_size_spin.setValue(self._config.get("icon_size", 100))
-        self._popup_width_spin.setValue(self._config.get("popup_width", 420))
-        self._prompt_edit.setText(self._config.get("prompt", ""))
-        self._tone_edit.setText(self._config.get("tts_tone", ""))
+
+    def save_values(self):
+        return {
+            "provider": self._provider_combo.currentData(),
+            "api_key": self._api_key_edit.text().strip(),
+            "prompt": self._prompt_edit.text().strip(),
+        }
+
+    def reload_values(self, cfg):
+        self._set_provider(cfg.get("provider", "stepfun"))
+        self._api_key_edit.setText(cfg.get("api_key", ""))
+        self._prompt_edit.setText(cfg.get("prompt", ""))
 
 
-    #样式
-    @staticmethod
-    def _label(text):
-        lbl = QLabel(text)
-        lbl.setStyleSheet(STYLE)
-        return lbl
+
+class TTSSettingPage(BaseSettingPage):
+    def _build(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(24, 16, 24, 16)
+        layout.setSpacing(12)
+
+        title = QLabel("TTS 设置")
+        title.setStyleSheet("font-size: 22px; font-weight: bold; color: #1e2026;")
+        layout.addWidget(title)
+
+        box = QGroupBox("语音合成")
+        box.setStyleSheet(GROUP_STYLE)
+        box_layout = QVBoxLayout(box)
+
+        form = QFormLayout()
+        form.setSpacing(10)
+
+        self._tts_provider_combo = QComboBox(self)
+        self._tts_provider_combo.setStyleSheet(COMBO_STYLE)
+        for pid, pname in TTS_PROVIDER_OPTIONS:
+            self._tts_provider_combo.addItem(pname, pid)
+        self._set_tts_provider(self._config.get("tts_provider", "stepfun"))
+        form.addRow(self._label("TTS 厂商:"), self._tts_provider_combo)
+
+        self._tts_key_edit = QLineEdit(self._config.get("tts_api_key", ""))
+        self._tts_key_edit.setStyleSheet(INPUT_STYLE)
+        self._tts_key_edit.setPlaceholderText("输入 StepFun TTS API Key（可留空）")
+        form.addRow(self._label("TTS Key:"), self._tts_key_edit)
+
+        self._tone_edit = QLineEdit(self._config.get("tts_tone", ""))
+        self._tone_edit.setStyleSheet(INPUT_STYLE)
+        self._tone_edit.setPlaceholderText("自定义音色")
+        form.addRow(self._label("Tone:"), self._tone_edit)
+
+        box_layout.addLayout(form)
+
+        instr_label = self._label("Instruction:")
+        box_layout.addWidget(instr_label)
+        self._instruction_edit = QTextEdit(self._config.get("tts_instruction", ""))
+        self._instruction_edit.setStyleSheet(TEXT_STYLE)
+        self._instruction_edit.setFixedHeight(80)
+        self._instruction_edit.setPlaceholderText("TTS 风格指令（可留空）")
+        box_layout.addWidget(self._instruction_edit)
+
+        layout.addWidget(box)
+        layout.addStretch()
+
+    def _set_tts_provider(self, pid):
+        idx = self._tts_provider_combo.findData(pid)
+        if idx >= 0:
+            self._tts_provider_combo.setCurrentIndex(idx)
+
+    def save_values(self):
+        return {
+            "tts_provider": self._tts_provider_combo.currentData(),
+            "tts_api_key": self._tts_key_edit.text().strip(),
+            "tts_tone": self._tone_edit.text().strip(),
+            "tts_instruction": self._instruction_edit.toPlainText().strip(),
+        }
+
+    def reload_values(self, cfg):
+        self._set_tts_provider(cfg.get("tts_provider", "stepfun"))
+        self._tts_key_edit.setText(cfg.get("tts_api_key", ""))
+        self._tone_edit.setText(cfg.get("tts_tone", ""))
+        self._instruction_edit.setPlainText(cfg.get("tts_instruction", ""))
+
+
+
+class WebSearchSettingPage(BaseSettingPage):
+    def _build(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(24, 16, 24, 16)
+        layout.setSpacing(12)
+
+        title = QLabel("Web 搜索设置")
+        title.setStyleSheet("font-size: 22px; font-weight: bold; color: #1e2026;")
+        layout.addWidget(title)
+
+        box = QGroupBox("Tavily 搜索")
+        box.setStyleSheet(GROUP_STYLE)
+        box_layout = QVBoxLayout(box)
+
+        hint = QLabel("配置 Tavily API Key 后，AI 可在对话中调用 Web 搜索工具。留空则不启用。")
+        hint.setWordWrap(True)
+        hint.setStyleSheet("color: #787d88; font-size: 11px;")
+        box_layout.addWidget(hint)
+
+        form = QFormLayout()
+        form.setSpacing(10)
+
+        self._tavily_key_edit = QLineEdit(self._config.get("tavily_api_key", ""))
+        self._tavily_key_edit.setStyleSheet(INPUT_STYLE)
+        self._tavily_key_edit.setPlaceholderText("输入 Tavily API Key（可留空）")
+        form.addRow(self._label("Tavily Key:"), self._tavily_key_edit)
+
+        box_layout.addLayout(form)
+        layout.addWidget(box)
+        layout.addStretch()
+
+    def save_values(self):
+        return {
+            "tavily_api_key": self._tavily_key_edit.text().strip(),
+        }
+
+    def reload_values(self, cfg):
+        self._tavily_key_edit.setText(cfg.get("tavily_api_key", ""))
+
+
+class VisionSettingPage(BaseSettingPage):
+    def _build(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(24, 16, 24, 16)
+        layout.setSpacing(12)
+
+        title = QLabel("识图 API 设置")
+        title.setStyleSheet("font-size: 22px; font-weight: bold; color: #1e2026;")
+        layout.addWidget(title)
+
+        box = QGroupBox("图像识别")
+        box.setStyleSheet(GROUP_STYLE)
+        box_layout = QVBoxLayout(box)
+
+        hint = QLabel("配置识图 API，图像识别将使用此处配置。")
+        hint.setWordWrap(True)
+        hint.setStyleSheet("color: #787d88; font-size: 11px;")
+        box_layout.addWidget(hint)
+
+        form = QFormLayout()
+        form.setSpacing(10)
+
+        self._vision_provider_combo = QComboBox(self)
+        self._vision_provider_combo.setStyleSheet(COMBO_STYLE)
+        for pid, pname in VLM_PROVIDER_OPTIONS:
+            self._vision_provider_combo.addItem(pname, pid)
+        self._set_vision_provider(self._config.get("vision_provider", "stepfun"))
+        form.addRow(self._label("模型厂商:"), self._vision_provider_combo)
+
+        self._vision_key_edit = QLineEdit(self._config.get("vision_api_key", ""))
+        self._vision_key_edit.setStyleSheet(INPUT_STYLE)
+        self._vision_key_edit.setPlaceholderText("输入API Key")
+        form.addRow(self._label("API Key:"), self._vision_key_edit)
+
+        box_layout.addLayout(form)
+        layout.addWidget(box)
+        layout.addStretch()
+
+    def _set_vision_provider(self, pid):
+        idx = self._vision_provider_combo.findData(pid)
+        if idx >= 0:
+            self._vision_provider_combo.setCurrentIndex(idx)
+
+    def save_values(self):
+        return {
+            "vision_provider": self._vision_provider_combo.currentData(),
+            "vision_api_key": self._vision_key_edit.text().strip(),
+        }
+
+    def reload_values(self, cfg):
+        self._set_vision_provider(cfg.get("vision_provider", "stepfun"))
+        self._vision_key_edit.setText(cfg.get("vision_api_key", ""))
