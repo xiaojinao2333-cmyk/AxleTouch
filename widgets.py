@@ -4,7 +4,7 @@ import os
 import tempfile
 import winsound
 from pathlib import Path
-from config_manager import save_config,load_config
+from config_manager import load_config
 import base64
 
 from schedule import Poller
@@ -12,18 +12,17 @@ from tts import TTSThread
 
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout,
                               QLineEdit, QPushButton, QLabel, QApplication,
-                              QMenu, QAction, QDialog, QFormLayout,
-                              QDialogButtonBox, QComboBox, QSpinBox)
+                              QMenu, QAction, QDialog)
 from PyQt5.QtCore import (Qt, QPoint, QRectF, QPropertyAnimation,
                            QEasingCurve, QTimer, pyqtSignal, QElapsedTimer,QBuffer)
 from PyQt5.QtGui import (QPainter, QBrush, QColor, QPen, QPainterPath,
                           QRegion, QCursor, QFontMetrics, QPixmap)
 
-from tools import _log_to_json,get_base_path, get_data_path,capture_screen
+from tools import _log_to_json, get_base_path, capture_screen
+from setting import SettingPage
 
 
 current_dir = get_base_path()
-data_dir = get_data_path()
 
 
 image_path = os.path.join(current_dir, "assets", "image.svg")
@@ -352,161 +351,125 @@ class InputPopup(QWidget):
 
 
 
-# 厂商列表（id, 显示名）
-PROVIDER_OPTIONS = [
-    ("stepfun", "阶跃星辰"),
-    ("bailian", "阿里百炼"),
-    ("deepseek", "DeepSeek"),
-]
-
-INPUT_STYLE = """
-    QLineEdit {
-        border: 1px solid #ebedf1;
-        border-radius: 6px; padding: 4px 8px;
-        background: white; color: #1e2026; font-size: 12px;
-    }
-    QLineEdit:focus { border-color: #5078f0; }
-"""
-
-SPIN_STYLE = """
-    QSpinBox {
-        border: 1px solid #ebedf1;
-        border-radius: 6px; padding: 4px 8px;
-        background: white; color: #1e2026; font-size: 12px;
-        min-width: 60px;
-    }
-"""
-
-COMBO_STYLE = """
-    QComboBox {
-        border: 1px solid #ebedf1;
-        border-radius: 6px; padding: 4px 8px;
-        background: white; color: #1e2026; font-size: 12px;
-    }
-    QComboBox::drop-down { border: none; }
-"""
-
-BTN_STYLE = """
-    QPushButton {
-        background: transparent; color: #787d88;
-        border: 1px solid #787d88;
-        border-radius: 6px; padding: 6px 14px;
-        font-size: 12px; font-weight: bold;
-    }
-    QPushButton:hover { background: #ebf0ff; }
-"""
-
-LABEL_STYLE = "color: #787d88; font-size: 16px;"
-
 class SettingsDialog(QDialog):
     config_saved = pyqtSignal(dict)
 
     def __init__(self, config, parent=None):
         super().__init__(parent)
-        self._config = config.copy()
-        self.setWindowTitle("设置")
-        self.setFixedSize(420, 380)
-        self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)
-        self.setAttribute(Qt.WA_TranslucentBackground, False)
+        self._config = config.copy() if config else {}
+        self._drag_pos = None
+        self.setWindowTitle("AxleTouch")
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.Tool)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setFixedSize(420, 650)
         self.init_ui()
 
     def init_ui(self):
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(12)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(20, 20, 20, 20)
+        outer.setSpacing(0)
 
-        form = QFormLayout()
+        self.top_bar = QWidget()
+        self.top_bar.setFixedHeight(52)
+        self.top_bar.setStyleSheet("background: transparent;")
+        top_layout = QHBoxLayout(self.top_bar)
+        top_layout.setContentsMargins(20, 0, 12, 0)
 
-        self._provider_combo = QComboBox(self)
-        self._provider_combo.setStyleSheet(COMBO_STYLE)
-        for pid, pname in PROVIDER_OPTIONS:
-            self._provider_combo.addItem(pname, pid)
-        current_provider = self._config.get("provider", "stepfun")
-        idx = self._provider_combo.findData(current_provider)
-        if idx >= 0:
-            self._provider_combo.setCurrentIndex(idx)
-        self._provider_combo.currentIndexChanged.connect(self._on_provider_changed)
-        form.addRow(self._label("模型厂商:"), self._provider_combo)
+        title = QLabel("AxleTouch")
+        title.setStyleSheet("font-size: 12pt; font-weight: bold; color: #1e2026;")
+        top_layout.addWidget(title)
+        top_layout.addStretch()
 
-        self._api_key_edit = QLineEdit(self._config.get("api_key", ""))
-        self._api_key_edit.setStyleSheet(INPUT_STYLE)
-        self._api_key_edit.setPlaceholderText("输入 API Key")
-        form.addRow(self._label("API Key:"), self._api_key_edit)
+        self.ok_btn = QPushButton("Yes")
+        self.ok_btn.setFixedSize(56, 32)
+        self.ok_btn.setCursor(QCursor(Qt.PointingHandCursor))
+        self.ok_btn.setStyleSheet("""
+            QPushButton {
+                background: #5078f0; color: white; border: none;
+                border-radius: 8px; font-size: 12px; font-weight: bold;
+            }
+            QPushButton:hover { background: #6090E8; }
+        """)
+        self.ok_btn.clicked.connect(self._on_save)
+        top_layout.addWidget(self.ok_btn)
 
-        self._tavily_key_edit = QLineEdit(self._config.get("tavily_api_key", ""))
-        self._tavily_key_edit.setStyleSheet(INPUT_STYLE)
-        self._tavily_key_edit.setPlaceholderText("输入 Tavily API Key（可留空）")
-        form.addRow(self._label("Tavily Key:"), self._tavily_key_edit)
+        self.cancel_btn = QPushButton("Cancel")
+        self.cancel_btn.setFixedSize(56, 32)
+        self.cancel_btn.setCursor(QCursor(Qt.PointingHandCursor))
+        self.cancel_btn.setStyleSheet("""
+            QPushButton {
+                background: transparent; color: #787d88;
+                border: 1px solid #787d88;
+                border-radius: 8px; font-size: 12px; font-weight: bold;
+            }
+            QPushButton:hover { background: #ebf0ff; }
+        """)
+        self.cancel_btn.clicked.connect(self._on_cancel)
+        top_layout.addWidget(self.cancel_btn)
 
-        self._tts_key_edit = QLineEdit(self._config.get("tts_api_key", ""))
-        self._tts_key_edit.setStyleSheet(INPUT_STYLE)
-        self._tts_key_edit.setPlaceholderText("输入 StepFun TTS API Key（可留空）")
-        form.addRow(self._label("TTS Key:"), self._tts_key_edit)
-
-        self._icon_size_spin = QSpinBox(self)
-        self._icon_size_spin.setStyleSheet(SPIN_STYLE)
-        self._icon_size_spin.setRange(50, 300)
-        self._icon_size_spin.setValue(self._config.get("icon_size", 100))
-        self._icon_size_spin.setSuffix(" px")
-        form.addRow(self._label("图标大小:"), self._icon_size_spin)
-
-        self._popup_width_spin = QSpinBox(self)
-        self._popup_width_spin.setStyleSheet(SPIN_STYLE)
-        self._popup_width_spin.setRange(200, 800)
-        self._popup_width_spin.setValue(self._config.get("popup_width", 420))
-        self._popup_width_spin.setSuffix(" px")
-        form.addRow(self._label("输入框宽度:"), self._popup_width_spin)
-
-        self._prompt_edit = QLineEdit(self._config.get("prompt", ""))
-        self._prompt_edit.setStyleSheet(INPUT_STYLE)
-        self._prompt_edit.setPlaceholderText("自定义prompt")
-        form.addRow(self._label("prompt："), self._prompt_edit)
-
-        self._tone_edit = QLineEdit(self._config.get("tts_tone",""))
-        self._tone_edit.setStyleSheet(INPUT_STYLE)
-        self._tone_edit.setPlaceholderText("自定义音色")
-        form.addRow(self._label("tone: "), self._tone_edit)
+        outer.addWidget(self.top_bar)
 
 
-        layout.addLayout(form)
-
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        buttons.setStyleSheet(BTN_STYLE)
-        buttons.accepted.connect(self._on_save)
-        buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons)
-
-    def _on_provider_changed(self, idx):
-        pname = self._provider_combo.currentText()
-        self._api_key_edit.setPlaceholderText(f"输入 {pname} API Key")
+        divider = QWidget()
+        divider.setFixedHeight(1)
+        divider.setStyleSheet("background: #ebedf1;")
+        outer.addWidget(divider)
+        self._about_page = SettingPage(config=self._config)
+        outer.addWidget(self._about_page, stretch=1)
 
     def _on_save(self):
-        provider = self._provider_combo.currentData()
-        api_key = self._api_key_edit.text().strip()
-        tavily_api_key = self._tavily_key_edit.text().strip()
-        tts_api_key = self._tts_key_edit.text().strip()
-        icon_size = self._icon_size_spin.value()
-        popup_width = self._popup_width_spin.value()
-        prompt = self._prompt_edit.text().strip()
-        tone = self._tone_edit.text().strip()
-
-        self._config["provider"] = provider
-        self._config["api_key"] = api_key
-        self._config["tavily_api_key"] = tavily_api_key
-        self._config["tts_api_key"] = tts_api_key
-        self._config["icon_size"] = icon_size
-        self._config["popup_width"] = popup_width
-        self._config["prompt"] = prompt
-        self._config["tone"] = tone
-        save_config(self._config)
-        self.config_saved.emit(self._config)
+        new_config = self._about_page.save_config_values()
+        self._config = new_config
+        self.config_saved.emit(new_config)
         self.accept()
 
-    @staticmethod
-    def _label(text):
-        lbl = QLabel(text)
-        lbl.setStyleSheet(LABEL_STYLE)
-        return lbl
+    def _on_cancel(self):
+        self._about_page.reload_config_values()
+        self.reject()
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self._drag_pos = event.globalPos() - self.frameGeometry().topLeft()
+            event.accept()
+
+    def mouseMoveEvent(self, event):
+        if event.buttons() & Qt.LeftButton and hasattr(self, '_drag_pos') and self._drag_pos is not None:
+            self.move(event.globalPos() - self._drag_pos)
+            event.accept()
+
+    def mouseReleaseEvent(self, event):
+        self._drag_pos = None
+
+    def _card_rect(self):
+        m = 20
+        return QRectF(m, m, self.width() - m * 2, self.height() - m * 2)
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        card = self._card_rect()
+        radius = 12
+
+        # 阴影
+        for i in range(4):
+            offset = 6 - i * 1.5
+            r = card.adjusted(-offset, -offset + 2, offset, offset + 2)
+            alpha = 8 + i * 8
+            painter.setBrush(QBrush(QColor(60, 65, 80, alpha)))
+            painter.setPen(Qt.NoPen)
+            painter.drawRoundedRect(r, radius + offset, radius + offset)
+
+
+        painter.setBrush(QBrush(QColor(251, 251, 253)))
+        painter.setPen(QPen(QColor(230, 232, 236), 0.5))
+        painter.drawRoundedRect(card, radius, radius)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        path = QPainterPath()
+        path.addRoundedRect(QRectF(self.rect()), 12, 12)
+        self.setMask(QRegion(path.toFillPolygon().toPolygon()))
 
 
 
@@ -711,7 +674,7 @@ class EdgeFloatingBlock(QWidget):
             }
         """)
 
-        settings_action = QAction("配置文件设置", self)
+        settings_action = QAction("关于与设置", self)
         settings_action.triggered.connect(self._open_settings)
         menu.addAction(settings_action)
 
