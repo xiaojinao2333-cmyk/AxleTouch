@@ -429,7 +429,7 @@ class SettingPage(BaseSettingPage):
         settings_layout.addLayout(row4)
 
         row5 = QHBoxLayout()
-        row5.addWidget(self._label("轮询时允许雨竹查看屏幕（即VLM轮询，启用后1/2 概率使用VLM）："))
+        row5.addWidget(self._label("轮询时允许雨竹查看屏幕（即VLM轮询）："))
         self.poller_vision_cb = QCheckBox("启用")
         self.poller_vision_cb.setChecked(self._config.get("poller_vision_enabled", False))
         row5.addWidget(self.poller_vision_cb)
@@ -437,22 +437,31 @@ class SettingPage(BaseSettingPage):
         settings_layout.addLayout(row5)
 
         row6 = QHBoxLayout()
-        row6.addWidget(self._label("图标大小（像素）："))
-        self.icon_size_edit = QLineEdit(str(self._config.get("icon_size", 100)))
-        self.icon_size_edit.setStyleSheet(INPUT_STYLE)
-        self.icon_size_edit.setPlaceholderText("100")
-        row6.addWidget(self.icon_size_edit)
+        row6.addWidget(self._label("轮询时使用VLM轮询的概率（使用0-1的浮点小数）"))
+        self.poller_vision_pr_cb = QLineEdit(str(self._config.get("poller_vision_probability", 0.5)))
+        self.poller_vision_pr_cb.setStyleSheet(INPUT_STYLE)
+        self.poller_vision_pr_cb.setPlaceholderText("0.5")
+        row6.addWidget(self.poller_vision_pr_cb)
         row6.addStretch()
         settings_layout.addLayout(row6)
 
         row7 = QHBoxLayout()
-        row7.addWidget(self._label("输入框宽度（像素）："))
+        row7.addWidget(self._label("图标大小（像素）："))
+        self.icon_size_edit = QLineEdit(str(self._config.get("icon_size", 100)))
+        self.icon_size_edit.setStyleSheet(INPUT_STYLE)
+        self.icon_size_edit.setPlaceholderText("100")
+        row7.addWidget(self.icon_size_edit)
+        row7.addStretch()
+        settings_layout.addLayout(row7)
+
+        row8 = QHBoxLayout()
+        row8.addWidget(self._label("输入框宽度（像素）："))
         self.popup_width_edit = QLineEdit(str(self._config.get("popup_width", 420)))
         self.popup_width_edit.setStyleSheet(INPUT_STYLE)
         self.popup_width_edit.setPlaceholderText("420")
-        row7.addWidget(self.popup_width_edit)
-        row7.addStretch()
-        settings_layout.addLayout(row7)
+        row8.addWidget(self.popup_width_edit)
+        row8.addStretch()
+        settings_layout.addLayout(row8)
 
         settings_layout.addStretch()
         layout.addWidget(settings_box)
@@ -482,6 +491,13 @@ class SettingPage(BaseSettingPage):
             popup_width = 420
         popup_width = max(200, popup_width)
 
+        try:
+            poller_vision_probability = float(self.poller_vision_pr_cb.text().strip() or 0.5)
+        except ValueError:
+            poller_vision_probability = 0.5
+        poller_vision_probability = min(1,poller_vision_probability)
+        poller_vision_probability = max(0,poller_vision_probability)
+
         return {
             "satiety_enabled": self.satiety_enabled_cb.isChecked(),
             "satiety_interval": satiety_interval,
@@ -489,6 +505,7 @@ class SettingPage(BaseSettingPage):
             "poller_vision_enabled": self.poller_vision_cb.isChecked(),
             "icon_size": icon_size,
             "popup_width": popup_width,
+            "poller_vision_probability": poller_vision_probability
         }
 
     def reload_values(self, cfg):
@@ -498,6 +515,7 @@ class SettingPage(BaseSettingPage):
         self.poller_vision_cb.setChecked(cfg.get("poller_vision_enabled", False))
         self.icon_size_edit.setText(str(cfg.get("icon_size", 100)))
         self.popup_width_edit.setText(str(cfg.get("popup_width", 420)))
+        self.poller_vision_pr_cb.setText(str(cfg.get("poller_vision_probability",0.5)))
 
     def startup(self):
         message = QMessageBox.question(None, "确认启用",

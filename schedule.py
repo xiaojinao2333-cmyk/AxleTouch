@@ -12,7 +12,7 @@ class Poller(QObject):
         super().__init__(parent)
         self._base_interval = 90          
         self._vision_enabled = False
-        self._vision_probability = 0.5    
+        self._vision_probability = 0.5
 
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
@@ -28,6 +28,7 @@ class Poller(QObject):
             interval = 90
         self._base_interval = max(10, interval)
         self._vision_enabled = bool(config.get("poller_vision_enabled", False))
+        self._vision_probability = int(config.get("poller_vision_probability", 0.5))
 
     def _schedule_next(self):
         base = self._base_interval
@@ -38,15 +39,17 @@ class Poller(QObject):
 
     def _trigger(self):
         from tools import get_active_window_title
+        print(self._vision_probability)
         window_title = get_active_window_title()
         now = datetime.now().strftime("%H:%M")
 
         status = f"当前时间: {now}，用户正在使用: {window_title}"
-        if not self._vision_enabled:
+        probability = random.random()
+        if not self._vision_enabled or probability >= self._vision_probability:
             print(" -----[ scheduled polling results ]----- ")
             self.status_ready.emit(status)
 
-        if self._vision_enabled and random.random() < self._vision_probability:
+        if self._vision_enabled and probability < self._vision_probability:
             print(" -----[ polling vision trigger ]----- ")
             self.vision_trigger.emit()
 
