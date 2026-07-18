@@ -1074,7 +1074,7 @@ class EdgeFloatingBlock(QWidget):
             self._poller.update_config(self._config)
 
     def _on_poller_vision(self):
-        self._capture()
+        self.capture()
 
     def _on_poller_status(self, status_text):
         if self._ai:
@@ -1334,8 +1334,9 @@ class EdgeFloatingBlock(QWidget):
         self._vision_ai.set_system_prompt("你是图像描述助手。请用中文客观、准确地描述图片内容，不要加入个人情感或对话语气。")
         self._vision_busy = True
         self._vision_ai.send_message(_data)
+        self._vision_busy = False
 
-    def _capture(self):
+    def capture(self):
         try:
             pixmap = capture_screen()
         except Exception:
@@ -1352,13 +1353,18 @@ class EdgeFloatingBlock(QWidget):
         pixmap.save(buffer, "PNG")
         data = buffer.data().toBase64().data().decode()
         image_url = f"data:image/png;base64,{data}"
-        print(" -----[ Action ]----- ", "\n",
-              "[", datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "]", "\n",
-              "\"", "雨竹看了一眼你的屏幕", "\"","\n")
         self._send_to_vision(
             image_url,
             "请客观、简洁地描述这张屏幕截图的内容，包括可见的窗口、文字、界面元素等。描述将交给主AI作为上下文。"
         )
+
+
+    def _capture(self):
+        print(" -----[ Action ]----- ", "\n",
+              "[", datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "]", "\n",
+              "\"", "雨竹看了一眼你的屏幕", "\"","\n")
+        self.capture()
+        
 
     def _on_feed(self):
         dialog = FeedDialog(self._satiety_level, self)
@@ -1395,7 +1401,7 @@ class EdgeFloatingBlock(QWidget):
         if self._vision_ai is not None:
             self._vision_ai.set_system_prompt("")
         if self._ai is not None:
-            user_msg = f"我刚发了一张屏幕截图给你，以下是图片内容描述：\n{description}\n请基于这个描述回复我。"
+            user_msg = f"现在是{datetime.now().strftime("%Y-%m-%d %H:%M:%S") }我刚发了一张屏幕截图给你，以下是图片内容描述：\n{description}\n请基于这个描述回复我。"
             self._ai.send_message(user_msg)
         else:
             self._on_ai_response(description)

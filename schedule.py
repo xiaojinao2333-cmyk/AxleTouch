@@ -40,9 +40,11 @@ class Poller(QObject):
         from tools import get_active_window_title
         window_title = get_active_window_title()
         now = datetime.now().strftime("%H:%M")
+
         status = f"当前时间: {now}，用户正在使用: {window_title}"
-        print(" -----[ scheduled polling results ]----- ")
-        self.status_ready.emit(status)
+        if not self._vision_enabled:
+            print(" -----[ scheduled polling results ]----- ")
+            self.status_ready.emit(status)
 
         if self._vision_enabled and random.random() < self._vision_probability:
             print(" -----[ polling vision trigger ]----- ")

@@ -403,7 +403,7 @@ class SettingPage(BaseSettingPage):
         settings_layout.addLayout(row)
 
         row2 = QHBoxLayout()
-        row2.addWidget(self._label("饱食度设定："))
+        row2.addWidget(self._label("启用饱食度下降："))
         self.satiety_enabled_cb = QCheckBox("启用")
         self.satiety_enabled_cb.setChecked(self._config.get("satiety_enabled", False))
         row2.addWidget(self.satiety_enabled_cb)
@@ -411,7 +411,7 @@ class SettingPage(BaseSettingPage):
         settings_layout.addLayout(row2)
 
         row3 = QHBoxLayout()
-        row3.addWidget(self._label("饱食度下降间隔（秒）："))
+        row3.addWidget(self._label("饱食度下降间隔（秒，即每x秒降低一点饱食度）："))
         self.satiety_interval_edit = QLineEdit(str(self._config.get("satiety_interval", 10)))
         self.satiety_interval_edit.setStyleSheet(INPUT_STYLE)
         self.satiety_interval_edit.setPlaceholderText("10")
@@ -420,7 +420,7 @@ class SettingPage(BaseSettingPage):
         settings_layout.addLayout(row3)
 
         row4 = QHBoxLayout()
-        row4.addWidget(self._label("轮询间隔（秒，实际 ±50% 抖动）："))
+        row4.addWidget(self._label("轮询间隔（秒，实际 ±50% 抖动 若启用VLM轮询 建议至少90s）："))
         self.poller_interval_edit = QLineEdit(str(self._config.get("poller_interval", 90)))
         self.poller_interval_edit.setStyleSheet(INPUT_STYLE)
         self.poller_interval_edit.setPlaceholderText("90")
@@ -429,7 +429,7 @@ class SettingPage(BaseSettingPage):
         settings_layout.addLayout(row4)
 
         row5 = QHBoxLayout()
-        row5.addWidget(self._label("轮询时允许雨竹查看屏幕（1/2 概率）："))
+        row5.addWidget(self._label("轮询时允许雨竹查看屏幕（即VLM轮询，启用后1/2 概率使用VLM）："))
         self.poller_vision_cb = QCheckBox("启用")
         self.poller_vision_cb.setChecked(self._config.get("poller_vision_enabled", False))
         row5.addWidget(self.poller_vision_cb)
