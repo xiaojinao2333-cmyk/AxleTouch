@@ -1081,7 +1081,8 @@ class EdgeFloatingBlock(QWidget):
             if self._hunger_timer.isActive():
                 hunger = self._hunger_level
                 desc = self._hunger_description(hunger)
-                full_status = f"{status_text}；雨竹当前饥饿度: {hunger}/100（{desc}）"
+                full_status = (f"{status_text}；雨竹当前饥饿度: {hunger}/100（{desc}）。"
+                               f"提示：饥饿度越高，雨竹越饥饿，请在回复中体现相应状态。")
             else:
                 full_status = status_text
             self._ai.send_message(full_status)
@@ -1155,7 +1156,15 @@ class EdgeFloatingBlock(QWidget):
               "[", datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "]", "\n",
               "\"", text, "\"","\n")
         if self._ai:
-            self._ai.send_message(text)
+            if self._hunger_timer.isActive():
+                hunger = self._hunger_level
+                desc = self._hunger_description(hunger)
+                full = (f"{text}\n"
+                        f"（系统提示：雨竹当前饥饿度: {hunger}/100（{desc}）。"
+                        f"饥饿度越高，雨竹越饥饿，请在回复中体现相应状态。）")
+            else:
+                full = text
+            self._ai.send_message(full)
 
     def init_ui(self):
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool)
