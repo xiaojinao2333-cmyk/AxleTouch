@@ -35,8 +35,8 @@ DEFAULT_CONFIG = {
     "prompt": DEFAULT_PROMPT,
     "tts_tone": DEFAULT_TONE,
     "tts_instruction": DEFAULT_TTS_INSTRUCTION,
-    "hunger_enabled": False,
-    "hunger_interval": 10,
+    "satiety_enabled": False,
+    "satiety_interval": 10,
     "poller_interval": 90,
     "poller_vision_enabled": False,
 }

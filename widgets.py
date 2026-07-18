@@ -651,7 +651,7 @@ class SettingsDialog(QDialog):
             painter.drawRoundedRect(side_rect, radius, radius)
 
 
-FULL_THRESHOLD = 20
+FULL_THRESHOLD = 80
 
 
 INPUT_STYLE_FEED = """
@@ -708,9 +708,9 @@ LIST_STYLE_FEED = """
 class FeedDialog(QDialog):
     food_selected = pyqtSignal(dict)
 
-    def __init__(self, hunger_level, parent=None):
+    def __init__(self, satiety_level, parent=None):
         super().__init__(parent)
-        self._hunger_level = hunger_level
+        self._satiety_level = satiety_level
         self._drag_pos = None
         self.setWindowTitle("喂雨竹")
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.Tool)
@@ -750,28 +750,28 @@ class FeedDialog(QDialog):
         top_layout.addWidget(close_btn)
         outer.addWidget(top_bar)
 
-        hunger_box = QWidget()
-        hunger_layout = QVBoxLayout(hunger_box)
-        hunger_layout.setContentsMargins(20, 8, 20, 8)
-        hunger_layout.setSpacing(8)
+        satiety_box = QWidget()
+        satiety_layout = QVBoxLayout(satiety_box)
+        satiety_layout.setContentsMargins(20, 8, 20, 8)
+        satiety_layout.setSpacing(8)
 
-        hunger_label_row = QHBoxLayout()
-        hunger_title = QLabel("当前饥饿度")
-        hunger_title.setStyleSheet("color: #1e2026; font-size: 12px;")
-        hunger_label_row.addWidget(hunger_title)
-        hunger_label_row.addStretch()
-        self._hunger_value_label = QLabel(f"{self._hunger_level}/100")
-        self._hunger_value_label.setStyleSheet(
+        satiety_label_row = QHBoxLayout()
+        satiety_title = QLabel("当前饱食度")
+        satiety_title.setStyleSheet("color: #1e2026; font-size: 12px;")
+        satiety_label_row.addWidget(satiety_title)
+        satiety_label_row.addStretch()
+        self._satiety_value_label = QLabel(f"{self._satiety_level}/100")
+        self._satiety_value_label.setStyleSheet(
             "color: #5078f0; font-size: 12px; font-weight: bold;")
-        hunger_label_row.addWidget(self._hunger_value_label)
-        hunger_layout.addLayout(hunger_label_row)
+        satiety_label_row.addWidget(self._satiety_value_label)
+        satiety_layout.addLayout(satiety_label_row)
 
-        self._hunger_bar = QProgressBar()
-        self._hunger_bar.setRange(0, 100)
-        self._hunger_bar.setValue(self._hunger_level)
-        self._hunger_bar.setTextVisible(False)
-        self._hunger_bar.setFixedHeight(8)
-        self._hunger_bar.setStyleSheet("""
+        self._satiety_bar = QProgressBar()
+        self._satiety_bar.setRange(0, 100)
+        self._satiety_bar.setValue(self._satiety_level)
+        self._satiety_bar.setTextVisible(False)
+        self._satiety_bar.setFixedHeight(8)
+        self._satiety_bar.setStyleSheet("""
             QProgressBar {
                 background: #ebedf1; border: none; border-radius: 4px;
             }
@@ -779,13 +779,13 @@ class FeedDialog(QDialog):
                 border-radius: 4px;
             }
         """)
-        self._apply_hunger_bar_color()
-        hunger_layout.addWidget(self._hunger_bar)
+        self._apply_satiety_bar_color()
+        satiety_layout.addWidget(self._satiety_bar)
 
         self._status_label = QLabel(self._status_text())
         self._status_label.setStyleSheet("color: #787d88; font-size: 11px;")
-        hunger_layout.addWidget(self._status_label)
-        outer.addWidget(hunger_box)
+        satiety_layout.addWidget(self._status_label)
+        outer.addWidget(satiety_box)
 
         div = QWidget()
         div.setFixedHeight(1)
@@ -858,7 +858,7 @@ class FeedDialog(QDialog):
 
         outer.addWidget(food_box, stretch=1)
 
-        self._is_full = self._hunger_level <= FULL_THRESHOLD
+        self._is_full = self._satiety_level >= FULL_THRESHOLD
         self._refresh_food_list()
 
     def _refresh_food_list(self):
@@ -867,7 +867,7 @@ class FeedDialog(QDialog):
             type_tag = "零食" if food["type"] == "snack" else "主食"
             disabled = self._is_full and food["type"] == "staple"
             suffix = "（吃饱啦~）" if disabled else ""
-            text = f"  {food['name']}    +{food['amount']} 饱腹度    [{type_tag}]{suffix}"
+            text = f"  {food['name']}    +{food['amount']} 饱食度    [{type_tag}]{suffix}"
             item = QListWidgetItem(text)
             item.setData(Qt.UserRole, food)
             if disabled:
@@ -928,28 +928,28 @@ class FeedDialog(QDialog):
         except Exception:
             pass
 
-    def _apply_hunger_bar_color(self):
-        level = self._hunger_level
-        if level <= FULL_THRESHOLD:
+    def _apply_satiety_bar_color(self):
+        level = self._satiety_level
+        if level >= FULL_THRESHOLD:
             color = "#67c23a"
-        elif level <= 50:
+        elif level >= 50:
             color = "#5078f0"
-        elif level <= 80:
+        elif level >= 20:
             color = "#e6a23c"
         else:
             color = "#f56c6c"
-        self._hunger_bar.setStyleSheet(
+        self._satiety_bar.setStyleSheet(
             "QProgressBar { background: #ebedf1; border: none; border-radius: 4px; }"
             f"QProgressBar::chunk {{ background: {color}; border-radius: 4px; }}"
         )
 
     def _status_text(self):
-        level = self._hunger_level
-        if level <= FULL_THRESHOLD:
+        level = self._satiety_level
+        if level >= FULL_THRESHOLD:
             return "雨竹现在饱饱的~"
-        elif level <= 50:
+        elif level >= 50:
             return "雨竹还好，有点想吃东西~"
-        elif level <= 80:
+        elif level >= 20:
             return "雨竹饿了，快喂喂她~"
         else:
             return "雨竹快饿坏了！"
@@ -1031,43 +1031,43 @@ class EdgeFloatingBlock(QWidget):
         self._poller.status_ready.connect(self._on_poller_status)
         self._poller.vision_trigger.connect(self._on_poller_vision)
 
-        self._hunger_level = 0
-        self._last_hunger_notify = 0
-        self._hunger_timer = QTimer(self)
-        self._hunger_timer.timeout.connect(self._increase_hunger)
+        self._satiety_level = 100
+        self._last_satiety_notify = -1
+        self._satiety_timer = QTimer(self)
+        self._satiety_timer.timeout.connect(self._decrease_satiety)
 
         self.init_ui()
 
-    def _increase_hunger(self):
-        if self._hunger_level < 100:
-            self._hunger_level += 1
-            self._update_hunger_display(self._hunger_level)
+    def _decrease_satiety(self):
+        if self._satiety_level > 0:
+            self._satiety_level -= 1
+            self._update_satiety_display(self._satiety_level)
 
     def _feed(self, amount):
-        self._hunger_level = max(0, self._hunger_level - amount)
-        self._update_hunger_display(self._hunger_level)
+        self._satiety_level = min(100, self._satiety_level + amount)
+        self._update_satiety_display(self._satiety_level)
 
-    def _update_hunger_display(self, level):
-        thresholds = {50: "有点饿了~", 80: "好饿好饿...", 100: "饿到没力气了..."}
-        if level in thresholds and self._last_hunger_notify != level:
+    def _update_satiety_display(self, level):
+        thresholds = {50: "有点饿了~", 20: "好饿好饿...", 0: "饿到没力气了..."}
+        if level in thresholds and self._last_satiety_notify != level:
             self._content_bar.show_content(thresholds[level])
-            self._last_hunger_notify = level
-        elif level < 50:
-            self._last_hunger_notify = 0
+            self._last_satiety_notify = level
+        elif level not in thresholds:
+            self._last_satiety_notify = -1
 
-    def _apply_hunger_config(self):
+    def _apply_satiety_config(self):
         if not self._config:
             return
-        enabled = self._config.get("hunger_enabled", False)
+        enabled = self._config.get("satiety_enabled", False)
         try:
-            interval = int(self._config.get("hunger_interval", 10))
+            interval = int(self._config.get("satiety_interval", 10))
         except (TypeError, ValueError):
             interval = 10
-        self._hunger_timer.setInterval(max(1, interval) * 1000)
-        if enabled and not self._hunger_timer.isActive():
-            self._hunger_timer.start()
-        elif not enabled and self._hunger_timer.isActive():
-            self._hunger_timer.stop()
+        self._satiety_timer.setInterval(max(1, interval) * 1000)
+        if enabled and not self._satiety_timer.isActive():
+            self._satiety_timer.start()
+        elif not enabled and self._satiety_timer.isActive():
+            self._satiety_timer.stop()
 
     def _apply_poller_config(self):
         if self._config:
@@ -1078,21 +1078,21 @@ class EdgeFloatingBlock(QWidget):
 
     def _on_poller_status(self, status_text):
         if self._ai:
-            if self._hunger_timer.isActive():
-                hunger = self._hunger_level
-                desc = self._hunger_description(hunger)
-                full_status = (f"{status_text}；雨竹当前饥饿度: {hunger}/100（{desc}）。"
-                               f"提示：饥饿度越高，雨竹越饥饿，请在回复中体现相应状态。")
+            if self._satiety_timer.isActive():
+                satiety = self._satiety_level
+                desc = self._satiety_description(satiety)
+                full_status = (f"{status_text}；雨竹当前饱食度: {satiety}/100（{desc}）。"
+                               f"提示：饱食度越低，雨竹越饥饿，请在回复中体现相应状态。")
             else:
                 full_status = status_text
             self._ai.send_message(full_status)
 
-    def _hunger_description(self, level):
-        if level <= FULL_THRESHOLD:
+    def _satiety_description(self, level):
+        if level >= FULL_THRESHOLD:
             return "饱腹"
-        elif level <= 50:
+        elif level >= 50:
             return "微饿"
-        elif level <= 80:
+        elif level >= 20:
             return "饥饿"
         else:
             return "非常饥饿"
@@ -1102,7 +1102,7 @@ class EdgeFloatingBlock(QWidget):
         self._config = config or {}
         self._ai.response_ready.connect(self._on_ai_response)
         self._apply_size_config()
-        self._apply_hunger_config()
+        self._apply_satiety_config()
         self._apply_poller_config()
 
 
@@ -1156,12 +1156,12 @@ class EdgeFloatingBlock(QWidget):
               "[", datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "]", "\n",
               "\"", text, "\"","\n")
         if self._ai:
-            if self._hunger_timer.isActive():
-                hunger = self._hunger_level
-                desc = self._hunger_description(hunger)
+            if self._satiety_timer.isActive():
+                satiety = self._satiety_level
+                desc = self._satiety_description(satiety)
                 full = (f"{text}\n"
-                        f"（系统提示：雨竹当前饥饿度: {hunger}/100（{desc}）。"
-                        f"饥饿度越高，雨竹越饥饿，请在回复中体现相应状态。）")
+                        f"（系统提示：雨竹当前饱食度: {satiety}/100（{desc}）。"
+                        f"饱食度越低，雨竹越饥饿，请在回复中体现相应状态。）")
             else:
                 full = text
             self._ai.send_message(full)
@@ -1355,12 +1355,12 @@ class EdgeFloatingBlock(QWidget):
         )
 
     def _on_feed(self):
-        dialog = FeedDialog(self._hunger_level, self)
+        dialog = FeedDialog(self._satiety_level, self)
         dialog.food_selected.connect(self._on_food_selected)
         dialog.exec_()
 
     def _on_food_selected(self, food):
-        was_full = self._hunger_level <= FULL_THRESHOLD
+        was_full = self._satiety_level >= FULL_THRESHOLD
         self._feed(food["amount"])
         if was_full and food["type"] == "snack":
             msg = "虽然已经饱了，但零食还是吃得下~"
@@ -1370,8 +1370,8 @@ class EdgeFloatingBlock(QWidget):
         if self._ai:
             type_desc = "零食" if food["type"] == "snack" else "主食"
             notify = (f"（系统事件：用户刚刚投喂了雨竹。食物：{food['name']}；"
-                      f"回复饱腹度：{food['amount']}；食品类型：{type_desc}。"
-                      f"雨竹当前饥饿度：{self._hunger_level}/100。）")
+                      f"回复饱食度：{food['amount']}；食品类型：{type_desc}。"
+                      f"雨竹当前饱食度：{self._satiety_level}/100。）")
             print(" -----[ Action ]----- ", "\n",
               "[", datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "]", "\n",
               "\"", f"你投喂了{food['name']}给雨竹", "\"","\n")
@@ -1390,7 +1390,7 @@ class EdgeFloatingBlock(QWidget):
     def _on_config_saved(self, config):
         self._config = config
         self._apply_size_config()
-        self._apply_hunger_config()
+        self._apply_satiety_config()
         self._apply_poller_config()
         if self._ai:
             self._ai.update(

@@ -403,19 +403,19 @@ class SettingPage(BaseSettingPage):
         settings_layout.addLayout(row)
 
         row2 = QHBoxLayout()
-        row2.addWidget(self._label("饥饿度设定："))
-        self.hunger_enabled_cb = QCheckBox("启用")
-        self.hunger_enabled_cb.setChecked(self._config.get("hunger_enabled", False))
-        row2.addWidget(self.hunger_enabled_cb)
+        row2.addWidget(self._label("饱食度设定："))
+        self.satiety_enabled_cb = QCheckBox("启用")
+        self.satiety_enabled_cb.setChecked(self._config.get("satiety_enabled", False))
+        row2.addWidget(self.satiety_enabled_cb)
         row2.addStretch()
         settings_layout.addLayout(row2)
 
         row3 = QHBoxLayout()
-        row3.addWidget(self._label("饥饿度增长间隔（秒）："))
-        self.hunger_interval_edit = QLineEdit(str(self._config.get("hunger_interval", 10)))
-        self.hunger_interval_edit.setStyleSheet(INPUT_STYLE)
-        self.hunger_interval_edit.setPlaceholderText("10")
-        row3.addWidget(self.hunger_interval_edit)
+        row3.addWidget(self._label("饱食度下降间隔（秒）："))
+        self.satiety_interval_edit = QLineEdit(str(self._config.get("satiety_interval", 10)))
+        self.satiety_interval_edit.setStyleSheet(INPUT_STYLE)
+        self.satiety_interval_edit.setPlaceholderText("10")
+        row3.addWidget(self.satiety_interval_edit)
         row3.addStretch()
         settings_layout.addLayout(row3)
 
@@ -459,10 +459,10 @@ class SettingPage(BaseSettingPage):
 
     def save_values(self):
         try:
-            hunger_interval = int(self.hunger_interval_edit.text().strip() or "10")
+            satiety_interval = int(self.satiety_interval_edit.text().strip() or "10")
         except ValueError:
-            hunger_interval = 10
-        hunger_interval = max(1, hunger_interval)
+            satiety_interval = 10
+        satiety_interval = max(1, satiety_interval)
 
         try:
             poller_interval = int(self.poller_interval_edit.text().strip() or "90")
@@ -483,8 +483,8 @@ class SettingPage(BaseSettingPage):
         popup_width = max(200, popup_width)
 
         return {
-            "hunger_enabled": self.hunger_enabled_cb.isChecked(),
-            "hunger_interval": hunger_interval,
+            "satiety_enabled": self.satiety_enabled_cb.isChecked(),
+            "satiety_interval": satiety_interval,
             "poller_interval": poller_interval,
             "poller_vision_enabled": self.poller_vision_cb.isChecked(),
             "icon_size": icon_size,
@@ -492,8 +492,8 @@ class SettingPage(BaseSettingPage):
         }
 
     def reload_values(self, cfg):
-        self.hunger_enabled_cb.setChecked(cfg.get("hunger_enabled", False))
-        self.hunger_interval_edit.setText(str(cfg.get("hunger_interval", 10)))
+        self.satiety_enabled_cb.setChecked(cfg.get("satiety_enabled", False))
+        self.satiety_interval_edit.setText(str(cfg.get("satiety_interval", 10)))
         self.poller_interval_edit.setText(str(cfg.get("poller_interval", 90)))
         self.poller_vision_cb.setChecked(cfg.get("poller_vision_enabled", False))
         self.icon_size_edit.setText(str(cfg.get("icon_size", 100)))
