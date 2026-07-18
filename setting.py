@@ -436,6 +436,24 @@ class SettingPage(BaseSettingPage):
         row5.addStretch()
         settings_layout.addLayout(row5)
 
+        row6 = QHBoxLayout()
+        row6.addWidget(self._label("图标大小（像素）："))
+        self.icon_size_edit = QLineEdit(str(self._config.get("icon_size", 100)))
+        self.icon_size_edit.setStyleSheet(INPUT_STYLE)
+        self.icon_size_edit.setPlaceholderText("100")
+        row6.addWidget(self.icon_size_edit)
+        row6.addStretch()
+        settings_layout.addLayout(row6)
+
+        row7 = QHBoxLayout()
+        row7.addWidget(self._label("输入框宽度（像素）："))
+        self.popup_width_edit = QLineEdit(str(self._config.get("popup_width", 420)))
+        self.popup_width_edit.setStyleSheet(INPUT_STYLE)
+        self.popup_width_edit.setPlaceholderText("420")
+        row7.addWidget(self.popup_width_edit)
+        row7.addStretch()
+        settings_layout.addLayout(row7)
+
         settings_layout.addStretch()
         layout.addWidget(settings_box)
 
@@ -452,11 +470,25 @@ class SettingPage(BaseSettingPage):
             poller_interval = 90
         poller_interval = max(10, poller_interval)
 
+        try:
+            icon_size = int(self.icon_size_edit.text().strip() or "100")
+        except ValueError:
+            icon_size = 100
+        icon_size = max(32, icon_size)
+
+        try:
+            popup_width = int(self.popup_width_edit.text().strip() or "420")
+        except ValueError:
+            popup_width = 420
+        popup_width = max(200, popup_width)
+
         return {
             "hunger_enabled": self.hunger_enabled_cb.isChecked(),
             "hunger_interval": hunger_interval,
             "poller_interval": poller_interval,
             "poller_vision_enabled": self.poller_vision_cb.isChecked(),
+            "icon_size": icon_size,
+            "popup_width": popup_width,
         }
 
     def reload_values(self, cfg):
@@ -464,6 +496,8 @@ class SettingPage(BaseSettingPage):
         self.hunger_interval_edit.setText(str(cfg.get("hunger_interval", 10)))
         self.poller_interval_edit.setText(str(cfg.get("poller_interval", 90)))
         self.poller_vision_cb.setChecked(cfg.get("poller_vision_enabled", False))
+        self.icon_size_edit.setText(str(cfg.get("icon_size", 100)))
+        self.popup_width_edit.setText(str(cfg.get("popup_width", 420)))
 
     def startup(self):
         message = QMessageBox.question(None, "确认启用",
