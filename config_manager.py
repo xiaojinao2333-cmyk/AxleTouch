@@ -39,7 +39,9 @@ DEFAULT_CONFIG = {
     "satiety_interval": 10,
     "poller_interval": 90,
     "poller_vision_enabled": False,
+    "poller_enabled": True,
     "poller_vision_probability": 0.5,
+    "poller_max_jitter": 0.5,
 }
 
 DEFAULT_FOODS = [
