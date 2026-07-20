@@ -794,12 +794,10 @@ class SettingPage(BaseSettingPage):
         message = QMessageBox.question(None, "确认启用",
                                      f"确定要启用该实验选项吗？\n若发生错误，目前的程序无法正确地fallback至 pyqtProperty 驱动，进而导致崩溃或异常。\n且 QVariantAnimation 所带来的优化极其有限。",
                                      QMessageBox.Yes | QMessageBox.No)
-        message.setStyleSheet("")
         if message == QMessageBox.Yes:
             message1 = QMessageBox.question(None, "再次警告",
                                      f"此实验性设置项可能会带来风险。可能导致 QVariantAnimation 与现有动画冲突，界面可能出现卡死或异常。",
                                      QMessageBox.Yes | QMessageBox.No)
-            message1.setStyleSheet("")
             if message1 == QMessageBox.Yes:
                 url = "https://www.bilibili.com/video/BV1UT42167xb"
                 webbrowser.open(url)
