@@ -417,6 +417,7 @@ class SidebarIndicator(QWidget):
         super().__init__(parent)
         self._indicator_y = 16.0
         self._anim = None
+        
 
     def get_indicator_y(self):
         return self._indicator_y
@@ -453,7 +454,7 @@ class SettingsDialog(QDialog):
         self.setWindowTitle("AxleTouch")
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.Tool)
         self.setAttribute(Qt.WA_TranslucentBackground)
-        self.setFixedSize(640, 560)
+        self.setFixedSize(640, 620)
         self._pages = []
         self.init_ui()
 
@@ -527,7 +528,7 @@ class SettingsDialog(QDialog):
         self._add_page("TTS", TTSSettingPage(self._config))
         self._add_page("搜索", WebSearchSettingPage(self._config))
         self._add_page("识图", VisionSettingPage(self._config))
-        self._add_page("通用",SettingPage(self._config))
+        self._add_page("通用", SettingPage(self._config))
         self.sidebar.layout().addStretch()
 
         self.sidebar_indicator = SidebarIndicator(self.sidebar)
